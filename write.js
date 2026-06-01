@@ -6,8 +6,8 @@ import { createClient } from "@supabase/supabase-js"
 import Link from "next/link"
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 )
 
 const EMPTY = { title: "", description: "", poster_url: "", youtube_id: "", price: 3000, genre: "", year: 2024, category: "\u041c\u043e\u043d\u0433\u043e\u043b \u043a\u0438\u043d\u043e", is_free: false }
