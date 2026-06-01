@@ -5,7 +5,7 @@ import Link from "next/link"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 const EMPTY = { title: "", description: "", poster_url: "", youtube_id: "", price: 3000, genre: "", year: 2024, category: "Монгол кино", is_free: false }
