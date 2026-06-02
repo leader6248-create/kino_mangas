@@ -214,9 +214,11 @@ export default function AdminPage() {
                 <textarea className={inp + " h-24 resize-none"} placeholder="Киноны тухай..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
               </div>
               <div>
-                <label className={lbl}>YouTube ID *</label>
-                <input className={inp} placeholder="dQw4w9WgXcQ" value={form.youtube_id} onChange={e => setForm({...form, youtube_id: e.target.value})} />
-                <p className="text-gray-600 text-xs mt-1">youtube.com/watch?v=<span className="text-yellow-500">ID</span></p>
+                <label className={lbl}>Видео ID *</label>
+                <input className={inp} placeholder="Bunny GUID эсвэл YouTube ID" value={form.youtube_id} onChange={e => setForm({...form, youtube_id: e.target.value})} />
+                <p className="text-gray-600 text-xs mt-1">
+                  Bunny: <span className="text-yellow-500">abc123-def456-...</span> | YouTube: <span className="text-yellow-500">dQw4w9WgXcQ</span>
+                </p>
               </div>
               <div>
                 <label className={lbl}>Ангилал</label>

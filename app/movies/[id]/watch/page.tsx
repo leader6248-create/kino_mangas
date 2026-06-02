@@ -85,13 +85,23 @@ export default function WatchPage({ params }) {
 
       <div className="flex-1 flex flex-col">
         <div className="w-full bg-black" style={{ aspectRatio: "16/9", maxHeight: "75vh" }}>
-          <iframe
-            src={"https://www.youtube.com/embed/" + movie.youtube_id + "?autoplay=1&rel=0&modestbranding=1"}
-            className="w-full h-full"
-            style={{ minHeight: "400px" }}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
+          {(() => {
+            const videoId = movie.youtube_id || ""
+            const isBunny = videoId.includes("-") && videoId.length > 20
+            const libraryId = process.env.NEXT_PUBLIC_BUNNY_LIBRARY_ID
+            const src = isBunny
+              ? `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?autoplay=true&preload=true`
+              : `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`
+            return (
+              <iframe
+                src={src}
+                className="w-full h-full"
+                style={{ minHeight: "400px" }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            )
+          })()}
         </div>
 
         <div className="px-6 py-6 max-w-4xl">
