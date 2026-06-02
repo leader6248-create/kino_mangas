@@ -18,12 +18,16 @@ const AuthContext = createContext<AuthContextType>({
 })
 
 async function fetchIsAdmin(userId: string): Promise<boolean> {
-  const { data } = await supabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", userId)
-    .maybeSingle()
-  return !!data?.is_admin
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", userId)
+      .maybeSingle()
+    return !!data?.is_admin
+  } catch {
+    return false
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -32,21 +36,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const u = session?.user ?? null
-      setUser(u)
-      setIsAdmin(u ? await fetchIsAdmin(u.id) : false)
-      setLoading(false)
-    })
+    let mounted = true
+
+    async function init() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!mounted) return
+        const u = session?.user ?? null
+        setUser(u)
+        if (u) {
+          const admin = await fetchIsAdmin(u.id)
+          if (mounted) setIsAdmin(admin)
+        }
+      } catch (err) {
+        console.error("Auth init error:", err)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    init()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return
       const u = session?.user ?? null
       setUser(u)
-      setIsAdmin(u ? await fetchIsAdmin(u.id) : false)
-      setLoading(false)
+      try {
+        if (u) {
+          const admin = await fetchIsAdmin(u.id)
+          if (mounted) setIsAdmin(admin)
+        } else {
+          setIsAdmin(false)
+        }
+      } catch (err) {
+        console.error("Auth state change error:", err)
+      } finally {
+        if (mounted) setLoading(false)
+      }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signOut = async () => {
