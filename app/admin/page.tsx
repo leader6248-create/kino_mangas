@@ -1,16 +1,15 @@
 'use client'
 import { useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabase"
 import Link from "next/link"
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-)
+import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
 
 const EMPTY = { title: "", description: "", poster_url: "", youtube_id: "", price: 3000, genre: "", year: 2024, category: "Монгол кино", is_free: false }
 
 export default function AdminPage() {
+  const { user, isAdmin, loading: authLoading } = useAuth()
+  const router = useRouter()
   const [movies, setMovies] = useState([])
   const [form, setForm] = useState(EMPTY)
   const [editing, setEditing] = useState(null)
@@ -19,7 +18,46 @@ export default function AdminPage() {
   const [msg, setMsg] = useState("")
   const [tab, setTab] = useState("list")
 
-  useEffect(() => { loadMovies() }, [])
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) {
+      router.push("/login")
+      return
+    }
+    if (!isAdmin) return
+    loadMovies()
+  }, [user, isAdmin, authLoading, router])
+
+  if (authLoading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(to bottom, #0a0a0f, #0f0a1a)" }}>
+        <div className="text-white text-xl animate-pulse">Карж байна...</div>
+      </main>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
+
+  if (!isAdmin) {
+    return (
+      <main className="min-h-screen flex items-center justify-center p-6" style={{ background: "linear-gradient(to bottom, #0a0a0f, #0f0a1a)" }}>
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-4">🚫</div>
+          <h1 className="text-2xl font-black text-white mb-2">Хандах эрхгүй</h1>
+          <p className="text-gray-400 mb-6">Та админ эрхгүй учраас энэ хуудсыг үзэх боломжгүй.</p>
+          <Link
+            href="/"
+            className="inline-block text-white px-6 py-3 rounded-xl font-bold"
+            style={{ background: "linear-gradient(135deg, #dc2626, #f59e0b)" }}
+          >
+            Нүүр хуудас руу
+          </Link>
+        </div>
+      </main>
+    )
+  }
 
   async function loadMovies() {
     const { data } = await supabase.from("movies").select("*").order("created_at", { ascending: false })

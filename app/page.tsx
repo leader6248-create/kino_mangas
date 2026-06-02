@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
+import Header from "@/components/Header"
 
 async function getMovies() {
   const { data } = await supabase.from("movies").select("*").order("view_count", { ascending: false })
@@ -52,41 +53,20 @@ export default async function Home() {
   const free = movies.filter(m => m.is_free)
 
   const sections = [
-    { title: "Хамгийн олон үзэлттэй", movies: topViews },
-    { title: "Шинэ кинонууд", movies: newest },
-    { title: "Монгол кино", movies: mongol },
-    { title: "Хятад кино", movies: hyatad },
-    { title: "Америк кино", movies: amerik },
-    { title: "Үнэгүй кинонууд", movies: free },
+    { title: "Хамгийн олон үзэлттэй", slug: "top", movies: topViews },
+    { title: "Шинэ кинонууд", slug: "new", movies: newest },
+    { title: "Монгол кино", slug: "mongol", movies: mongol },
+    { title: "Хятад кино", slug: "hyatad", movies: hyatad },
+    { title: "Америк кино", slug: "amerik", movies: amerik },
+    { title: "Үнэгүй кинонууд", slug: "free", movies: free },
   ]
 
   return (
     <main className="min-h-screen text-white" style={{background: "linear-gradient(to bottom, #0a0a0f, #0f0a1a)"}}>
-      <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-yellow-900/30 px-6 py-2 flex items-center justify-between" style={{background: "rgba(10,8,20,0.95)"}}>
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2">
-          <img src="/logo.png" alt="Кино Мангас" className="h-12 w-auto object-contain" />
-            <div className="flex flex-col leading-none">
-              <span className="text-red-500 font-black text-xl tracking-widest">КИНО</span>
-              <span className="text-yellow-400 font-black text-xl tracking-widest">МАНГАС</span>
-            </div>
-          </Link>
-          <nav className="hidden md:flex gap-5 text-sm text-gray-400">
-            <a href="#" className="hover:text-yellow-400 transition-colors">Нүүр</a>
-            <a href="#" className="hover:text-yellow-400 transition-colors">Монгол кино</a>
-            <a href="#" className="hover:text-yellow-400 transition-colors">Хятад кино</a>
-            <a href="#" className="hover:text-yellow-400 transition-colors">Америк кино</a>
-            <a href="#" className="hover:text-yellow-400 transition-colors text-green-400">Үнэгүй</a>
-          </nav>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="text-gray-400 hover:text-white text-sm px-3 py-1.5 rounded-lg border border-gray-700 hover:border-yellow-500 transition-colors">Нэвтрэх</button>
-          <button className="text-white text-sm px-4 py-1.5 rounded-lg font-bold" style={{background: "linear-gradient(135deg, #dc2626, #f59e0b)"}}>Бүртгүүлэх</button>
-        </div>
-      </header>
+      <Header />
 
       {featured && (
-        <section className="relative h-screen flex items-end pb-24 px-8 pt-16">
+        <section className="relative h-[60vh] flex items-end pb-10 px-8 pt-16">
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url(" + featured.poster_url + ")" }} />
           <div className="absolute inset-0" style={{background: "linear-gradient(to right, rgba(10,8,20,0.98) 40%, rgba(10,8,20,0.4) 100%)"}} />
           <div className="absolute inset-0" style={{background: "linear-gradient(to top, rgba(10,8,20,1) 0%, transparent 60%)"}} />
@@ -96,19 +76,19 @@ export default async function Home() {
               <span className="bg-gray-800/80 text-gray-300 text-xs px-3 py-1 rounded-full">{featured.category}</span>
               {featured.is_free && <span className="bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full border border-green-500/30">Үнэгүй</span>}
             </div>
-            <h2 className="text-6xl font-black mb-3 leading-tight">{featured.title}</h2>
-            <div className="flex items-center gap-4 text-sm text-gray-300 mb-4">
+            <h2 className="text-4xl md:text-5xl font-black mb-2 leading-tight">{featured.title}</h2>
+            <div className="flex items-center gap-4 text-sm text-gray-300 mb-3">
               <span className="text-yellow-400 font-black text-lg">&#9733; 9.2</span>
               <span>{featured.year}</span>
               <span>{featured.genre}</span>
               <span>{featured.view_count?.toLocaleString()} үзэлт</span>
             </div>
-            <p className="text-gray-300 mb-8 text-base leading-relaxed line-clamp-2">{featured.description}</p>
+            <p className="text-gray-300 mb-5 text-sm leading-relaxed line-clamp-2">{featured.description}</p>
             <div className="flex gap-3 flex-wrap">
-              <Link href={"/movies/" + featured.id} className="text-white px-10 py-4 rounded-xl font-black text-lg transition-all hover:scale-105 shadow-lg flex items-center gap-2" style={{background: "linear-gradient(135deg, #dc2626, #f59e0b)"}}>
+              <Link href={"/movies/" + featured.id} className="text-white px-7 py-3 rounded-xl font-black text-base transition-all hover:scale-105 shadow-lg flex items-center gap-2" style={{background: "linear-gradient(135deg, #dc2626, #f59e0b)"}}>
                 &#9654; Одоо үзэх
               </Link>
-              <span className="bg-gray-800/60 backdrop-blur text-yellow-400 px-6 py-4 rounded-xl font-black text-lg border border-yellow-500/30">
+              <span className="bg-gray-800/60 backdrop-blur text-yellow-400 px-5 py-3 rounded-xl font-black text-base border border-yellow-500/30">
                 {featured.is_free ? "Үнэгүй" : featured.price?.toLocaleString() + "₮"}
               </span>
             </div>
@@ -116,15 +96,15 @@ export default async function Home() {
         </section>
       )}
 
-      <div className="relative z-10 px-6 pb-20 space-y-10 -mt-6">
+      <div className="relative z-10 px-6 pb-10 space-y-6 -mt-4">
         {sections.map(section =>
           section.movies.length > 0 ? (
             <div key={section.title}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-black text-yellow-400">{section.title}</h3>
-                <a href="#" className="text-sm text-gray-500 hover:text-yellow-400 transition-colors">Бүгдийг харах →</a>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-base font-black text-yellow-400">{section.title}</h3>
+                <Link href={"/category/" + section.slug} className="text-xs text-gray-500 hover:text-yellow-400 transition-colors">Бүгдийг харах →</Link>
               </div>
-              <div className="flex gap-4 overflow-x-auto pb-4">
+              <div className="flex gap-3 overflow-x-auto pb-2">
                 {section.movies.map(movie => <MovieCard key={movie.id} movie={movie} />)}
               </div>
             </div>
@@ -132,12 +112,12 @@ export default async function Home() {
         )}
       </div>
 
-      <footer className="border-t border-yellow-900/30 px-8 py-10 text-center" style={{background: "rgba(10,8,20,0.95)"}}>
-        <div className="flex items-center justify-center gap-1 mb-2">
-          <span className="text-red-500 font-black text-2xl tracking-widest">КИНО</span>
-          <span className="text-yellow-400 font-black text-2xl tracking-widest">МАНГАС</span>
+      <footer className="border-t border-yellow-900/30 px-8 py-6 text-center" style={{background: "rgba(10,8,20,0.95)"}}>
+        <div className="flex items-center justify-center gap-1 mb-1">
+          <span className="text-red-500 font-black text-xl tracking-widest">КИНО</span>
+          <span className="text-yellow-400 font-black text-xl tracking-widest">МАНГАС</span>
         </div>
-        <p className="text-gray-600 text-sm">2024 &#169; Бүх эрх хуулиар хамгаалагдсан</p>
+        <p className="text-gray-600 text-xs">2024 &#169; Бүх эрх хуулиар хамгаалагдсан</p>
       </footer>
     </main>
   )
