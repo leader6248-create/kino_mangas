@@ -1,0 +1,107 @@
+import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+
+async function getQpayToken(): Promise<string> {
+  const credentials = Buffer.from(
+    `${process.env.QPAY_USERNAME}:${process.env.QPAY_PASSWORD}`
+  ).toString("base64")
+
+  const res = await fetch("https://merchant.qpay.mn/v2/auth/token", {
+    method: "POST",
+    headers: { Authorization: `Basic ${credentials}` },
+  })
+
+  if (!res.ok) throw new Error("QPay token авахад алдаа гарлаа")
+  const data = await res.json()
+  return data.access_token
+}
+
+async function verifyQpayPayment(invoiceId: string): Promise<boolean> {
+  const token = await getQpayToken()
+  const res = await fetch("https://merchant.qpay.mn/v2/payment/check", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      object_type: "INVOICE",
+      object_id: invoiceId,
+      offset: { page_number: 1, page_limit: 100 },
+    }),
+  })
+
+  if (!res.ok) return false
+  const data = await res.json()
+  return (data.count || 0) > 0 &&
+    (data.rows || []).some((r: any) => r.payment_status === "PAID")
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get("Authorization") || ""
+    const accessToken = authHeader.replace("Bearer ", "")
+
+    if (!accessToken) {
+      return NextResponse.json({ error: "Нэвтрэх шаардлагатай" }, { status: 401 })
+    }
+
+    // Validate user with anon client + their token
+    const userClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${accessToken}` } } }
+    )
+    const { data: { user }, error: userErr } = await userClient.auth.getUser()
+    if (userErr || !user) {
+      return NextResponse.json({ error: "Хэрэглэгч олдсонгүй" }, { status: 401 })
+    }
+
+    const { movieId, invoiceId } = await req.json()
+    if (!movieId || !invoiceId) {
+      return NextResponse.json({ error: "movieId ба invoiceId шаардлагатай" }, { status: 400 })
+    }
+
+    // Verify QPay payment server-side
+    const paid = await verifyQpayPayment(invoiceId)
+    if (!paid) {
+      return NextResponse.json({ error: "Төлбөр баталгаажаагүй байна" }, { status: 402 })
+    }
+
+    // Use service role to bypass RLS for the insert
+    const adminClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_KEY!
+    )
+
+    // Get movie price
+    const { data: movie } = await adminClient
+      .from("movies")
+      .select("price")
+      .eq("id", movieId)
+      .single()
+
+    if (!movie) {
+      return NextResponse.json({ error: "Кино олдсонгүй" }, { status: 404 })
+    }
+
+    const { error: insertErr } = await adminClient
+      .from("purchases")
+      .upsert({
+        user_id: user.id,
+        movie_id: movieId,
+        qpay_invoice_id: invoiceId,
+        amount: movie.price,
+      }, { onConflict: "user_id,movie_id" })
+
+    if (insertErr) {
+      console.error("Purchase insert error:", insertErr)
+      return NextResponse.json({ error: insertErr.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    console.error("Record purchase error:", err)
+    return NextResponse.json({ error: err.message || "Дотоод алдаа" }, { status: 500 })
+  }
+}

@@ -39,13 +39,24 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
   }, [movie.id])
 
   const recordPurchase = useCallback(async (qpayInvoiceId: string) => {
-    await supabase.from("purchases").insert({
-      user_id: userId,
-      movie_id: movie.id,
-      qpay_invoice_id: qpayInvoiceId,
-      amount: movie.price,
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    if (!token) throw new Error("Нэвтэрсэн сэшн олдсонгүй")
+
+    const res = await fetch("/api/qpay/record-purchase", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ movieId: movie.id, invoiceId: qpayInvoiceId }),
     })
-  }, [userId, movie.id, movie.price])
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      console.error("Purchase record error:", data)
+      throw new Error(data.error || "Худалдан авалт бүртгэгдсэнгүй")
+    }
+  }, [movie.id])
 
   const checkPayment = useCallback(async () => {
     if (!invoice?.invoice_id) return
@@ -69,12 +80,17 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
   useEffect(() => {
     if (!invoice?.invoice_id) return
     const timer = setInterval(async () => {
-      const res = await fetch(`/api/qpay/check?invoice_id=${invoice.invoice_id}`)
-      const data = await res.json()
-      if (data.paid) {
-        clearInterval(timer)
-        await recordPurchase(invoice.invoice_id)
-        onSuccess()
+      try {
+        const res = await fetch(`/api/qpay/check?invoice_id=${invoice.invoice_id}`)
+        const data = await res.json()
+        if (data.paid) {
+          clearInterval(timer)
+          await recordPurchase(invoice.invoice_id)
+          onSuccess()
+        }
+      } catch (err: any) {
+        console.error("Auto-check error:", err)
+        setError(err.message || "Худалдан авалт бүртгэхэд алдаа")
       }
     }, 5000)
     return () => clearInterval(timer)
