@@ -36,7 +36,6 @@ export default function Header() {
           <Link href="/category/mongol" className="hover:text-yellow-400 transition-colors">Монгол кино</Link>
           <Link href="/category/hyatad" className="hover:text-yellow-400 transition-colors">Хятад кино</Link>
           <Link href="/category/amerik" className="hover:text-yellow-400 transition-colors">Америк кино</Link>
-          <Link href="/category/free" className="hover:text-yellow-400 transition-colors text-green-400">Үнэгүй</Link>
         </nav>
       </div>
 
@@ -62,13 +61,6 @@ export default function Header() {
                   <p className="text-xs text-gray-500">Нэвтэрсэн</p>
                   <p className="text-sm text-white font-bold truncate">{user.email}</p>
                 </div>
-                <Link
-                  href="/my-movies"
-                  onClick={() => setMenuOpen(false)}
-                  className="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-yellow-400 transition-colors"
-                >
-                  🎬 Миний кинонууд
-                </Link>
                 {isAdmin && (
                   <Link
                     href="/admin"

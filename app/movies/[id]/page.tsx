@@ -1,10 +1,8 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 import { use } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
 
 function formatViews(n) {
   if (n >= 10000) return (n / 10000).toFixed(1) + "W"
@@ -12,265 +10,21 @@ function formatViews(n) {
   return String(n || 0)
 }
 
-function QpayModal({ movie, userId, onClose, onSuccess }) {
-  const [invoice, setInvoice] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [checking, setChecking] = useState(false)
-  const [error, setError] = useState("")
-  // Guards against recording the same payment twice (auto-poll + manual click
-  // can both detect "paid" at the same time).
-  const finalizedRef = useRef(false)
-
-  useEffect(() => {
-    async function createInvoice() {
-      try {
-        const res = await fetch("/api/qpay/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ movieId: movie.id }),
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || "Алдаа гарлаа")
-        setInvoice(data)
-      } catch (err: any) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-    createInvoice()
-  }, [movie.id])
-
-  const recordPurchase = useCallback(async (qpayInvoiceId: string) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
-    if (!token) throw new Error("Нэвтэрсэн сэшн олдсонгүй")
-
-    const res = await fetch("/api/qpay/record-purchase", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ movieId: movie.id, invoiceId: qpayInvoiceId }),
-    })
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      console.error("Purchase record error:", data)
-      throw new Error(data.error || "Худалдан авалт бүртгэгдсэнгүй")
-    }
-  }, [movie.id])
-
-  // Records the purchase and navigates exactly once, even if both the
-  // auto-poller and the manual button detect payment simultaneously.
-  const finalize = useCallback(async (qpayInvoiceId: string) => {
-    if (finalizedRef.current) return
-    finalizedRef.current = true
-    try {
-      await recordPurchase(qpayInvoiceId)
-      onSuccess()
-    } catch (err) {
-      finalizedRef.current = false // let the user retry
-      throw err
-    }
-  }, [recordPurchase, onSuccess])
-
-  const checkPayment = useCallback(async () => {
-    if (!invoice?.invoice_id || checking) return
-    setChecking(true)
-    setError("")
-    try {
-      const res = await fetch(`/api/qpay/check?invoice_id=${invoice.invoice_id}`)
-      const data = await res.json()
-      if (data.paid) {
-        await finalize(invoice.invoice_id)
-      } else {
-        setError("Төлбөр хараахан баталгаажаагүй байна. Төлбөрөө төлсний дараа дахин шалгана уу.")
-      }
-    } catch (err: any) {
-      setError(err?.message || "Шалгахад алдаа гарлаа")
-    } finally {
-      setChecking(false)
-    }
-  }, [invoice, checking, finalize])
-
-  useEffect(() => {
-    if (!invoice?.invoice_id) return
-    const timer = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/qpay/check?invoice_id=${invoice.invoice_id}`)
-        const data = await res.json()
-        if (data.paid) {
-          clearInterval(timer)
-          await finalize(invoice.invoice_id)
-        }
-      } catch (err: any) {
-        console.error("Auto-check error:", err)
-        setError(err?.message || "Худалдан авалтыг баталгаажуулахад алдаа гарлаа")
-      }
-    }, 5000)
-    return () => clearInterval(timer)
-  }, [invoice, finalize])
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-gray-900 rounded-2xl border border-gray-700 p-6 max-w-sm w-full">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-black text-white">QPay төлбөр</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-2xl leading-none">&times;</button>
-        </div>
-
-        <div className="text-center mb-4">
-          <p className="text-gray-400 text-sm">{movie.title}</p>
-          <p className="text-3xl font-black text-yellow-400 mt-1">{movie.price?.toLocaleString()}₮</p>
-        </div>
-
-        {loading && (
-          <div className="flex flex-col items-center py-8 gap-3">
-            <div className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
-            <p className="text-gray-400 text-sm">Invoice үүсгэж байна...</p>
-          </div>
-        )}
-
-        {!loading && error && !invoice && (
-          <div className="text-center py-6">
-            <p className="text-red-400 text-sm">{error}</p>
-          </div>
-        )}
-
-        {invoice && (
-          <>
-            <div className="bg-white rounded-xl p-3 flex items-center justify-center mb-4">
-              {invoice.qr_image ? (
-                <img
-                  src={`data:image/png;base64,${invoice.qr_image}`}
-                  alt="QPay QR"
-                  className="w-48 h-48 object-contain"
-                />
-              ) : (
-                <p className="text-gray-500 text-xs text-center p-4">QR код ачааллаагүй байна</p>
-              )}
-            </div>
-
-            <p className="text-gray-400 text-xs text-center mb-4">
-              QPay апп-аар QR кодыг скан хийж төлбөрөө төлнө үү
-            </p>
-
-            {invoice.urls && invoice.urls.length > 0 && (
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {invoice.urls.slice(0, 4).map((u: any, i: number) => {
-                  // QPay returns mostly custom-scheme deeplinks (khanbank://, qpaywallet://,
-                  // statebank://, xacbank://, ...). Mobile browsers refuse to open those
-                  // in a new tab via target="_blank" — the OS app-intent only fires for
-                  // same-window navigations. Open web URLs in a new tab, deeplinks in place.
-                  const isWeb = /^https?:/i.test(u.link)
-                  return (
-                    <a
-                      key={i}
-                      href={u.link}
-                      {...(isWeb ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                      className="bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 px-3 rounded-lg text-center transition-colors border border-gray-700 truncate"
-                    >
-                      {u.name}
-                    </a>
-                  )
-                })}
-              </div>
-            )}
-
-            {error && <p className="text-yellow-400 text-xs text-center mb-3">{error}</p>}
-
-            <button
-              onClick={checkPayment}
-              disabled={checking}
-              className="w-full py-3 rounded-xl font-black text-white transition-all disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg, #dc2626, #f59e0b)" }}
-            >
-              {checking ? "Шалгаж байна..." : "Төлбөр шалгах"}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function LoginPrompt({ onClose }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-gray-900 rounded-2xl border border-gray-700 p-8 max-w-sm w-full text-center">
-        <div className="text-5xl mb-4">🔐</div>
-        <h3 className="text-xl font-black text-white mb-2">Нэвтрэх шаардлагатай</h3>
-        <p className="text-gray-400 text-sm mb-6">
-          Кино худалдан авахын тулд эхлээд бүртгэлдээ нэвтэрнэ үү
-        </p>
-        <div className="flex gap-2">
-          <Link
-            href="/login"
-            className="flex-1 py-3 rounded-xl font-black text-white transition-all hover:scale-105"
-            style={{ background: "linear-gradient(135deg, #dc2626, #f59e0b)" }}
-          >
-            Нэвтрэх
-          </Link>
-          <Link
-            href="/register"
-            className="flex-1 py-3 rounded-xl font-black text-white bg-gray-800 hover:bg-gray-700 transition-all border border-gray-700"
-          >
-            Бүртгүүлэх
-          </Link>
-        </div>
-        <button onClick={onClose} className="text-gray-500 hover:text-white text-sm mt-4">
-          Болих
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export default function MoviePage({ params }) {
   const { id } = use(params)
-  const { user, loading: authLoading } = useAuth()
   const [movie, setMovie] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [purchased, setPurchased] = useState(false)
-  const [showQpay, setShowQpay] = useState(false)
-  const [showLogin, setShowLogin] = useState(false)
-  const router = useRouter()
 
   useEffect(() => {
     async function load() {
       const { data } = await supabase.from("movies").select("*").eq("id", id).single()
       setMovie(data)
-
-      if (user && data && !data.is_free) {
-        const { data: purchase } = await supabase
-          .from("purchases")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("movie_id", id)
-          .maybeSingle()
-        setPurchased(!!purchase)
-      }
       setLoading(false)
     }
-    if (!authLoading) load()
-  }, [id, user, authLoading])
+    load()
+  }, [id])
 
-  const handlePaySuccess = useCallback(() => {
-    setShowQpay(false)
-    setPurchased(true)
-    router.push(`/movies/${id}/watch`)
-  }, [id, router])
-
-  const handleBuy = () => {
-    if (!user) {
-      setShowLogin(true)
-    } else {
-      setShowQpay(true)
-    }
-  }
-
-  if (loading || authLoading) return (
+  if (loading) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
       <div className="text-white text-xl animate-pulse">Карж байна...</div>
     </div>
@@ -283,21 +37,8 @@ export default function MoviePage({ params }) {
     </div>
   )
 
-  const canWatch = movie.is_free || purchased
-
   return (
     <main className="min-h-screen bg-gray-950 text-white">
-      {showQpay && user && (
-        <QpayModal
-          movie={movie}
-          userId={user.id}
-          onClose={() => setShowQpay(false)}
-          onSuccess={handlePaySuccess}
-        />
-      )}
-
-      {showLogin && <LoginPrompt onClose={() => setShowLogin(false)} />}
-
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-gray-800 px-8 py-3 flex items-center justify-between">
         <Link href="/" className="text-xl font-black text-red-500 tracking-wider">MOVIE MN</Link>
         <Link href="/" className="text-sm text-gray-400 hover:text-white transition-colors">← Буцах</Link>
@@ -312,8 +53,6 @@ export default function MoviePage({ params }) {
             <span className="bg-gray-800/80 text-gray-300 text-xs px-3 py-1 rounded-full">{movie.category}</span>
             <span className="bg-gray-800/80 text-gray-300 text-xs px-3 py-1 rounded-full">{movie.genre}</span>
             <span className="bg-gray-800/80 text-gray-300 text-xs px-3 py-1 rounded-full">{movie.year}</span>
-            {movie.is_free && <span className="bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full border border-green-500/30">Үнэгүй</span>}
-            {purchased && <span className="bg-blue-500/20 text-blue-400 text-xs px-3 py-1 rounded-full border border-blue-500/30">✓ Худалдаж авсан</span>}
           </div>
           <h1 className="text-5xl font-black mb-4 leading-tight">{movie.title}</h1>
           <div className="flex items-center gap-6 text-sm text-gray-400 mb-6">
@@ -323,18 +62,12 @@ export default function MoviePage({ params }) {
           </div>
           <p className="text-gray-300 text-base leading-relaxed mb-8 max-w-xl">{movie.description}</p>
           <div className="flex gap-3 flex-wrap items-center">
-            {canWatch ? (
-              <Link href={"/movies/" + movie.id + "/watch"} className="bg-red-500 hover:bg-red-600 text-white px-10 py-4 rounded-xl font-black text-lg transition-all hover:scale-105 shadow-lg shadow-red-900/40">
-                &#9654; Үзэх
-              </Link>
-            ) : (
-              <button
-                onClick={handleBuy}
-                className="bg-red-500 hover:bg-red-600 text-white px-10 py-4 rounded-xl font-black text-lg transition-all hover:scale-105 shadow-lg shadow-red-900/40"
-              >
-                &#9654; Үзэх — {movie.price?.toLocaleString()}₮
-              </button>
-            )}
+            <Link
+              href={"/movies/" + movie.id + "/watch"}
+              className="bg-red-500 hover:bg-red-600 text-white px-10 py-4 rounded-xl font-black text-lg transition-all hover:scale-105 shadow-lg shadow-red-900/40"
+            >
+              &#9654; Үзэх
+            </Link>
             <button className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-4 rounded-xl font-bold text-base transition-all border border-gray-700">
               &#43; Жагсаалтад нэмэх
             </button>
@@ -367,24 +100,11 @@ export default function MoviePage({ params }) {
             </div>
           </div>
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 h-fit">
-            <p className="text-gray-400 text-sm mb-2">Үнэ</p>
-            <p className="text-3xl font-black text-red-400 mb-4">
-              {movie.is_free ? "Үнэгүй" : movie.price?.toLocaleString() + "₮"}
-            </p>
-            {canWatch ? (
-              <Link href={"/movies/" + movie.id + "/watch"} className="block w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-black text-center transition-all">
-                Үзэх
-              </Link>
-            ) : (
-              <button
-                onClick={handleBuy}
-                className="w-full text-white py-3 rounded-xl font-black transition-all hover:scale-105"
-                style={{ background: "linear-gradient(135deg, #dc2626, #f59e0b)" }}
-              >
-                QPay-аар төлөх
-              </button>
-            )}
-            <p className="text-gray-600 text-xs text-center mt-3">QPay-аар төлбөр төлнө</p>
+            <p className="text-gray-400 text-sm mb-2">Үзэх</p>
+            <p className="text-3xl font-black text-green-400 mb-4">Үнэгүй</p>
+            <Link href={"/movies/" + movie.id + "/watch"} className="block w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-black text-center transition-all">
+              Үзэх
+            </Link>
           </div>
         </div>
       </section>
