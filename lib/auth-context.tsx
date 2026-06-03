@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js"
 
 type AuthContextType = {
   user: User | null
+  accessToken: string | null
   isAdmin: boolean
   loading: boolean
   signOut: () => Promise<void>
@@ -12,6 +13,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  accessToken: null,
   isAdmin: false,
   loading: true,
   signOut: async () => {},
@@ -32,6 +34,7 @@ async function fetchIsAdmin(userId: string): Promise<boolean> {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -44,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return
         const u = session?.user ?? null
         setUser(u)
+        setAccessToken(session?.access_token ?? null)
         if (u) {
           const admin = await fetchIsAdmin(u.id)
           if (mounted) setIsAdmin(admin)
@@ -61,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return
       const u = session?.user ?? null
       setUser(u)
+      setAccessToken(session?.access_token ?? null)
       try {
         if (u) {
           const admin = await fetchIsAdmin(u.id)
@@ -83,11 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
+    setAccessToken(null)
     setIsAdmin(false)
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, signOut }}>
+    <AuthContext.Provider value={{ user, accessToken, isAdmin, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   )

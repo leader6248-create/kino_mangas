@@ -12,7 +12,7 @@ function formatViews(n) {
   return String(n || 0)
 }
 
-function QpayModal({ movie, userId, onClose, onSuccess }) {
+function QpayModal({ movie, userId, accessToken, onClose, onSuccess }) {
   const [invoice, setInvoice] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
@@ -52,18 +52,19 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
   }, [movie.id, appendDebug])
 
   const recordPurchase = useCallback(async (qpayInvoiceId: string) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
-    if (!token) {
-      appendDebug("record: NO SESSION TOKEN")
-      throw new Error("Нэвтэрсэн сэшн олдсонгүй")
+    // Use the access token captured by the auth context at sign-in time.
+    // Calling supabase.auth.getSession() here would hang on iOS Safari at
+    // the worst moment (right after payment), leaving the modal stuck.
+    if (!accessToken) {
+      appendDebug("record: NO TOKEN PROP")
+      throw new Error("Нэвтэрсэн сэшн олдсонгүй — дахин нэвтрэх шаардлагатай")
     }
-    appendDebug("record: posting…")
+    appendDebug(`record: posting (tok=${accessToken.length}b)`)
     const res = await fetch("/api/qpay/record-purchase", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ movieId: movie.id, invoiceId: qpayInvoiceId }),
     })
@@ -75,7 +76,7 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
       console.error("Purchase record error:", parsed)
       throw new Error(parsed.error || `HTTP ${res.status}`)
     }
-  }, [movie.id, appendDebug])
+  }, [movie.id, accessToken, appendDebug])
 
   // Records the purchase and navigates exactly once, even if both the
   // auto-poller and the manual button detect payment simultaneously.
@@ -267,7 +268,7 @@ function LoginPrompt({ onClose }) {
 
 export default function MoviePage({ params }) {
   const { id } = use(params)
-  const { user, loading: authLoading } = useAuth()
+  const { user, accessToken, loading: authLoading } = useAuth()
   const [movie, setMovie] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [purchased, setPurchased] = useState(false)
@@ -329,6 +330,7 @@ export default function MoviePage({ params }) {
         <QpayModal
           movie={movie}
           userId={user.id}
+          accessToken={accessToken}
           onClose={() => setShowQpay(false)}
           onSuccess={handlePaySuccess}
         />
