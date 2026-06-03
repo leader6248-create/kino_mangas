@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
+import LoadingScreen from "@/components/LoadingScreen"
 
 const EMPTY = { title: "", description: "", poster_url: "", youtube_id: "", price: 3000, genre: "", year: 2024, category: "Монгол кино", is_free: false }
 
@@ -28,13 +29,8 @@ export default function AdminPage() {
     loadMovies()
   }, [user, isAdmin, authLoading, router])
 
-  if (authLoading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(to bottom, #0a0a0f, #0f0a1a)" }}>
-        <div className="text-white text-xl animate-pulse">Ачааллаж байна...</div>
-      </main>
-    )
-  }
+  if (authLoading) return <LoadingScreen />
+
 
   if (!user) {
     return null

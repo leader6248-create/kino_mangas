@@ -5,6 +5,7 @@ import Link from "next/link"
 import { use } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import LoadingScreen from "@/components/LoadingScreen"
 
 function formatViews(n) {
   if (n >= 10000) return (n / 10000).toFixed(1) + "W"
@@ -317,11 +318,8 @@ export default function MoviePage({ params }) {
     }
   }
 
-  if (loading || authLoading) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <div className="text-white text-xl animate-pulse">Ачааллаж байна...</div>
-    </div>
-  )
+  if (loading || authLoading) return <LoadingScreen />
+
 
   if (!movie) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center flex-col gap-4">

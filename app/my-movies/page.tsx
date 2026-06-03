@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context"
 import Header from "@/components/Header"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import LoadingScreen from "@/components/LoadingScreen"
 
 export default function MyMoviesPage() {
   const { user, loading: authLoading } = useAuth()
@@ -46,7 +47,7 @@ export default function MyMoviesPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-20 text-gray-500">Ачааллаж байна...</div>
+          <LoadingScreen variant="inline" />
         ) : movies.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-5xl mb-4">🎬</div>

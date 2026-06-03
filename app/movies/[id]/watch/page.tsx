@@ -5,6 +5,7 @@ import Link from "next/link"
 import { use } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import LoadingScreen from "@/components/LoadingScreen"
 
 export default function WatchPage({ params }) {
   const { id } = use(params)
@@ -48,11 +49,8 @@ export default function WatchPage({ params }) {
     if (!authLoading) load()
   }, [id, user, authLoading])
 
-  if (loading || authLoading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="text-white text-xl animate-pulse">Ачааллаж байна...</div>
-    </div>
-  )
+  if (loading || authLoading) return <LoadingScreen />
+
 
   if (!movie) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
