@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     const accessToken = authHeader.replace("Bearer ", "")
 
     if (!accessToken) {
+      console.warn("[record-purchase] missing auth")
       return NextResponse.json({ error: "Нэвтрэх шаардлагатай" }, { status: 401 })
     }
 
@@ -54,16 +55,19 @@ export async function POST(req: NextRequest) {
     )
     const { data: { user }, error: userErr } = await userClient.auth.getUser()
     if (userErr || !user) {
+      console.warn("[record-purchase] user lookup failed:", userErr?.message)
       return NextResponse.json({ error: "Хэрэглэгч олдсонгүй" }, { status: 401 })
     }
 
     const { movieId, invoiceId } = await req.json()
+    console.log("[record-purchase]", { user: user.id.slice(0, 8), movieId: String(movieId).slice(0, 8), invoiceId })
     if (!movieId || !invoiceId) {
       return NextResponse.json({ error: "movieId ба invoiceId шаардлагатай" }, { status: 400 })
     }
 
     // Verify QPay payment server-side
     const paid = await verifyQpayPayment(invoiceId)
+    console.log("[record-purchase] QPay verify ->", paid, " invoice:", invoiceId)
     if (!paid) {
       return NextResponse.json({ error: "Төлбөр баталгаажаагүй байна" }, { status: 402 })
     }
