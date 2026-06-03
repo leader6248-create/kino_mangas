@@ -7,6 +7,7 @@ const CATEGORIES: Record<string, { title: string; filter: (m: any) => boolean }>
   mongol: { title: "Монгол кино", filter: (m) => m.category === "Монгол кино" },
   hyatad: { title: "Хятад кино", filter: (m) => m.category === "Хятад кино" },
   amerik: { title: "Америк кино", filter: (m) => m.category === "Америк кино" },
+  free: { title: "Үнэгүй кинонууд", filter: (m) => m.is_free },
   new: { title: "Шинэ кинонууд", filter: () => true },
   top: { title: "Хамгийн олон үзэлттэй", filter: () => true },
 }
@@ -53,6 +54,9 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
                 <div className="bg-gray-900 rounded-xl overflow-hidden border border-gray-800 group-hover:border-yellow-500 transition-all duration-300 group-hover:scale-105">
                   <div className="relative">
                     <img src={movie.poster_url} alt={movie.title} className="w-full aspect-[2/3] object-cover" />
+                    {movie.is_free && (
+                      <span className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">Үнэгүй</span>
+                    )}
                     <span className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full">{movie.year}</span>
                   </div>
                   <div className="p-3">
@@ -60,7 +64,9 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
                     <p className="text-gray-400 text-xs mt-1">{movie.genre}</p>
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-gray-400 text-xs">{formatViews(movie.view_count)} үзэлт</span>
-                      <span className="text-green-400 text-xs font-bold">Үнэгүй</span>
+                      <span className={"text-xs font-bold " + (movie.is_free ? "text-green-400" : "text-yellow-400")}>
+                        {movie.is_free ? "Үнэгүй" : movie.price?.toLocaleString() + "₮"}
+                      </span>
                     </div>
                   </div>
                 </div>

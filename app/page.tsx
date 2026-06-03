@@ -22,6 +22,9 @@ function MovieCard({ movie }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
             <span className="text-white text-xs font-bold bg-red-600 px-2 py-1 rounded-full">Үзэх</span>
           </div>
+          {movie.is_free && (
+            <span className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">Үнэгүй</span>
+          )}
           <span className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full">{movie.year}</span>
         </div>
         <div className="p-3">
@@ -29,7 +32,9 @@ function MovieCard({ movie }) {
           <p className="text-gray-400 text-xs mt-1">{movie.genre}</p>
           <div className="flex items-center justify-between mt-2">
             <span className="text-gray-400 text-xs">{formatViews(movie.view_count)} үзэлт</span>
-            <span className="text-green-400 text-xs font-bold">Үнэгүй</span>
+            <span className={"text-xs font-bold " + (movie.is_free ? "text-green-400" : "text-yellow-400")}>
+              {movie.is_free ? "Үнэгүй" : movie.price?.toLocaleString() + "₮"}
+            </span>
           </div>
         </div>
       </div>
@@ -45,6 +50,7 @@ export default async function Home() {
   const amerik = movies.filter(m => m.category === "Америк кино")
   const topViews = [...movies].sort((a, b) => b.view_count - a.view_count).slice(0, 8)
   const newest = [...movies].sort((a, b) => b.year - a.year).slice(0, 8)
+  const free = movies.filter(m => m.is_free)
 
   const sections = [
     { title: "Хамгийн олон үзэлттэй", slug: "top", movies: topViews },
@@ -52,6 +58,7 @@ export default async function Home() {
     { title: "Монгол кино", slug: "mongol", movies: mongol },
     { title: "Хятад кино", slug: "hyatad", movies: hyatad },
     { title: "Америк кино", slug: "amerik", movies: amerik },
+    { title: "Үнэгүй кинонууд", slug: "free", movies: free },
   ]
 
   return (
@@ -67,7 +74,7 @@ export default async function Home() {
             <div className="flex items-center gap-2 mb-3 flex-wrap">
               <span className="text-white text-xs px-3 py-1 rounded-full font-bold" style={{background: "linear-gradient(135deg, #dc2626, #f59e0b)"}}>&#11088; ОНЦЛОХ</span>
               <span className="bg-gray-800/80 text-gray-300 text-xs px-3 py-1 rounded-full">{featured.category}</span>
-              <span className="bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full border border-green-500/30">Үнэгүй</span>
+              {featured.is_free && <span className="bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full border border-green-500/30">Үнэгүй</span>}
             </div>
             <h2 className="text-4xl md:text-5xl font-black mb-2 leading-tight">{featured.title}</h2>
             <div className="flex items-center gap-4 text-sm text-gray-300 mb-3">
@@ -81,8 +88,8 @@ export default async function Home() {
               <Link href={"/movies/" + featured.id} className="text-white px-7 py-3 rounded-xl font-black text-base transition-all hover:scale-105 shadow-lg flex items-center gap-2" style={{background: "linear-gradient(135deg, #dc2626, #f59e0b)"}}>
                 &#9654; Одоо үзэх
               </Link>
-              <span className="bg-gray-800/60 backdrop-blur text-green-400 px-5 py-3 rounded-xl font-black text-base border border-green-500/30">
-                Үнэгүй
+              <span className="bg-gray-800/60 backdrop-blur text-yellow-400 px-5 py-3 rounded-xl font-black text-base border border-yellow-500/30">
+                {featured.is_free ? "Үнэгүй" : featured.price?.toLocaleString() + "₮"}
               </span>
             </div>
           </div>
