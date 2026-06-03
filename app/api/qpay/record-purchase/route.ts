@@ -85,6 +85,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Кино олдсонгүй" }, { status: 404 })
     }
 
+    const paidAt = new Date().toISOString()
+
+    // qpay_invoice_id has a UNIQUE constraint. If this invoice was already
+    // recorded (e.g. the client polled + clicked "check" for the same invoice),
+    // this is an idempotent retry — just make sure it's marked paid and succeed
+    // instead of crashing on the duplicate-key violation.
+    const { data: existingByInvoice } = await adminClient
+      .from("purchases")
+      .select("id")
+      .eq("qpay_invoice_id", invoiceId)
+      .maybeSingle()
+
+    if (existingByInvoice) {
+      await adminClient
+        .from("purchases")
+        .update({ status: "paid", paid_at: paidAt })
+        .eq("id", existingByInvoice.id)
+      return NextResponse.json({ success: true })
+    }
+
     const { error: insertErr } = await adminClient
       .from("purchases")
       .upsert({
@@ -92,9 +112,16 @@ export async function POST(req: NextRequest) {
         movie_id: movieId,
         qpay_invoice_id: invoiceId,
         amount: movie.price,
+        status: "paid",
+        paid_at: paidAt,
       }, { onConflict: "user_id,movie_id" })
 
     if (insertErr) {
+      // 23505 = unique violation: a concurrent request just recorded the same
+      // invoice. The purchase is recorded, so treat it as success.
+      if (insertErr.code === "23505") {
+        return NextResponse.json({ success: true })
+      }
       console.error("Purchase insert error:", insertErr)
       return NextResponse.json({ error: insertErr.message }, { status: 500 })
     }

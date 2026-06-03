@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 import { use } from "react"
@@ -17,6 +17,9 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState("")
+  // Guards against recording the same payment twice (auto-poll + manual click
+  // can both detect "paid" at the same time).
+  const finalizedRef = useRef(false)
 
   useEffect(() => {
     async function createInvoice() {
@@ -58,24 +61,38 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
     }
   }, [movie.id])
 
+  // Records the purchase and navigates exactly once, even if both the
+  // auto-poller and the manual button detect payment simultaneously.
+  const finalize = useCallback(async (qpayInvoiceId: string) => {
+    if (finalizedRef.current) return
+    finalizedRef.current = true
+    try {
+      await recordPurchase(qpayInvoiceId)
+      onSuccess()
+    } catch (err) {
+      finalizedRef.current = false // let the user retry
+      throw err
+    }
+  }, [recordPurchase, onSuccess])
+
   const checkPayment = useCallback(async () => {
-    if (!invoice?.invoice_id) return
+    if (!invoice?.invoice_id || checking) return
     setChecking(true)
+    setError("")
     try {
       const res = await fetch(`/api/qpay/check?invoice_id=${invoice.invoice_id}`)
       const data = await res.json()
       if (data.paid) {
-        await recordPurchase(invoice.invoice_id)
-        onSuccess()
+        await finalize(invoice.invoice_id)
       } else {
-        setError("Төлбөр баталгаажаагүй байна. Дахин шалгана уу.")
+        setError("Төлбөр хараахан баталгаажаагүй байна. Төлбөрөө төлсний дараа дахин шалгана уу.")
       }
-    } catch {
-      setError("Шалгахад алдаа гарлаа")
+    } catch (err: any) {
+      setError(err?.message || "Шалгахад алдаа гарлаа")
     } finally {
       setChecking(false)
     }
-  }, [invoice, onSuccess, recordPurchase])
+  }, [invoice, checking, finalize])
 
   useEffect(() => {
     if (!invoice?.invoice_id) return
@@ -85,16 +102,15 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
         const data = await res.json()
         if (data.paid) {
           clearInterval(timer)
-          await recordPurchase(invoice.invoice_id)
-          onSuccess()
+          await finalize(invoice.invoice_id)
         }
       } catch (err: any) {
         console.error("Auto-check error:", err)
-        setError(err.message || "Худалдан авалт бүртгэхэд алдаа")
+        setError(err?.message || "Худалдан авалтыг баталгаажуулахад алдаа гарлаа")
       }
     }, 5000)
     return () => clearInterval(timer)
-  }, [invoice, onSuccess, recordPurchase])
+  }, [invoice, finalize])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
