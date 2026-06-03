@@ -40,27 +40,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true
+    let settled = false
 
-    async function init() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!mounted) return
-        const u = session?.user ?? null
-        setUser(u)
-        setAccessToken(session?.access_token ?? null)
-        if (u) {
-          const admin = await fetchIsAdmin(u.id)
-          if (mounted) setIsAdmin(admin)
-        }
-      } catch (err) {
-        console.error("Auth init error:", err)
-      } finally {
-        if (mounted) setLoading(false)
+    // Hard fallback: if supabase never resolves the initial session
+    // (iOS Safari has been seen to hang here), don't block the UI on
+    // "Карж байна..." forever. After 3s, give up and proceed as
+    // signed-out; a later auth-state event can still update state.
+    const fallback = setTimeout(() => {
+      if (mounted && !settled) {
+        settled = true
+        setLoading(false)
       }
-    }
+    }, 3000)
 
-    init()
-
+    // supabase-js fires INITIAL_SESSION via onAuthStateChange on subscribe,
+    // so we don't need a separate getSession() call (which is the call that
+    // can hang). Relying solely on the subscription avoids that path.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return
       const u = session?.user ?? null
@@ -76,12 +71,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error("Auth state change error:", err)
       } finally {
-        if (mounted) setLoading(false)
+        if (mounted && !settled) {
+          settled = true
+          setLoading(false)
+        }
       }
     })
 
     return () => {
       mounted = false
+      clearTimeout(fallback)
       subscription.unsubscribe()
     }
   }, [])
