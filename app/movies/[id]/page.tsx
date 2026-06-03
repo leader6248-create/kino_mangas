@@ -17,6 +17,13 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState("")
+  // Visible debug log shown at the bottom of the modal — every check call
+  // appends a line so the user can screenshot exactly what's happening.
+  const [debugLog, setDebugLog] = useState<string[]>([])
+  const appendDebug = useCallback((line: string) => {
+    const ts = new Date().toTimeString().slice(0, 8)
+    setDebugLog((prev) => [...prev.slice(-9), `${ts} ${line}`])
+  }, [])
   // Guards against recording the same payment twice (auto-poll + manual click
   // can both detect "paid" at the same time).
   const finalizedRef = useRef(false)
@@ -24,6 +31,7 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
   useEffect(() => {
     async function createInvoice() {
       try {
+        appendDebug("create: posting…")
         const res = await fetch("/api/qpay/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -32,20 +40,25 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || "Алдаа гарлаа")
         setInvoice(data)
+        appendDebug(`create OK invoice=${String(data.invoice_id).slice(0, 12)}`)
       } catch (err: any) {
         setError(err.message)
+        appendDebug(`create ERR ${err.message}`)
       } finally {
         setLoading(false)
       }
     }
     createInvoice()
-  }, [movie.id])
+  }, [movie.id, appendDebug])
 
   const recordPurchase = useCallback(async (qpayInvoiceId: string) => {
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
-    if (!token) throw new Error("Нэвтэрсэн сэшн олдсонгүй")
-
+    if (!token) {
+      appendDebug("record: NO SESSION TOKEN")
+      throw new Error("Нэвтэрсэн сэшн олдсонгүй")
+    }
+    appendDebug("record: posting…")
     const res = await fetch("/api/qpay/record-purchase", {
       method: "POST",
       headers: {
@@ -54,12 +67,15 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
       },
       body: JSON.stringify({ movieId: movie.id, invoiceId: qpayInvoiceId }),
     })
+    const txt = await res.text()
+    appendDebug(`record: ${res.status} ${txt.slice(0, 80)}`)
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      console.error("Purchase record error:", data)
-      throw new Error(data.error || "Худалдан авалт бүртгэгдсэнгүй")
+      let parsed: any = {}
+      try { parsed = JSON.parse(txt) } catch {}
+      console.error("Purchase record error:", parsed)
+      throw new Error(parsed.error || `HTTP ${res.status}`)
     }
-  }, [movie.id])
+  }, [movie.id, appendDebug])
 
   // Records the purchase and navigates exactly once, even if both the
   // auto-poller and the manual button detect payment simultaneously.
@@ -79,38 +95,46 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
     if (!invoice?.invoice_id || checking) return
     setChecking(true)
     setError("")
+    appendDebug("check (manual)…")
     try {
       const res = await fetch(`/api/qpay/check?invoice_id=${invoice.invoice_id}`)
       const data = await res.json()
+      const cnt = data?.data?.count ?? 0
+      appendDebug(`check: paid=${data.paid} count=${cnt}`)
       if (data.paid) {
         await finalize(invoice.invoice_id)
       } else {
         setError("Төлбөр хараахан баталгаажаагүй байна. Төлбөрөө төлсний дараа дахин шалгана уу.")
       }
     } catch (err: any) {
+      appendDebug(`check ERR ${err?.message}`)
       setError(err?.message || "Шалгахад алдаа гарлаа")
     } finally {
       setChecking(false)
     }
-  }, [invoice, checking, finalize])
+  }, [invoice, checking, finalize, appendDebug])
 
   useEffect(() => {
     if (!invoice?.invoice_id) return
+    appendDebug("auto-poll started")
     const timer = setInterval(async () => {
       try {
         const res = await fetch(`/api/qpay/check?invoice_id=${invoice.invoice_id}`)
         const data = await res.json()
+        const cnt = data?.data?.count ?? 0
+        appendDebug(`auto: paid=${data.paid} count=${cnt}`)
         if (data.paid) {
           clearInterval(timer)
           await finalize(invoice.invoice_id)
         }
       } catch (err: any) {
         console.error("Auto-check error:", err)
+        appendDebug(`auto ERR ${err?.message}`)
         setError(err?.message || "Худалдан авалтыг баталгаажуулахад алдаа гарлаа")
       }
     }, 5000)
     return () => clearInterval(timer)
-  }, [invoice, finalize])
+  }, [invoice, finalize, appendDebug])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -188,6 +212,20 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
             >
               {checking ? "Шалгаж байна..." : "Төлбөр шалгах"}
             </button>
+
+            {debugLog.length > 0 && (
+              <div className="mt-4 bg-black/60 border border-gray-800 rounded-lg p-2 max-h-40 overflow-y-auto">
+                <p className="text-gray-500 text-[10px] font-bold mb-1">DEBUG (screenshot үүнийг)</p>
+                <p className="text-gray-500 text-[10px] mb-1 break-all">
+                  invoice: {String(invoice?.invoice_id || "-").slice(0, 20)}…
+                </p>
+                {debugLog.map((line, i) => (
+                  <p key={i} className="text-green-400 text-[10px] font-mono leading-tight break-all">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
