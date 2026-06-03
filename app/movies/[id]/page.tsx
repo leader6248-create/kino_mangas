@@ -158,17 +158,23 @@ function QpayModal({ movie, userId, onClose, onSuccess }) {
 
             {invoice.urls && invoice.urls.length > 0 && (
               <div className="grid grid-cols-2 gap-2 mb-4">
-                {invoice.urls.slice(0, 4).map((u: any, i: number) => (
-                  <a
-                    key={i}
-                    href={u.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 px-3 rounded-lg text-center transition-colors border border-gray-700 truncate"
-                  >
-                    {u.name}
-                  </a>
-                ))}
+                {invoice.urls.slice(0, 4).map((u: any, i: number) => {
+                  // QPay returns mostly custom-scheme deeplinks (khanbank://, qpaywallet://,
+                  // statebank://, xacbank://, ...). Mobile browsers refuse to open those
+                  // in a new tab via target="_blank" — the OS app-intent only fires for
+                  // same-window navigations. Open web URLs in a new tab, deeplinks in place.
+                  const isWeb = /^https?:/i.test(u.link)
+                  return (
+                    <a
+                      key={i}
+                      href={u.link}
+                      {...(isWeb ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                      className="bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 px-3 rounded-lg text-center transition-colors border border-gray-700 truncate"
+                    >
+                      {u.name}
+                    </a>
+                  )
+                })}
               </div>
             )}
 
