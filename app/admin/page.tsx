@@ -31,7 +31,7 @@ export default function AdminPage() {
   if (authLoading) {
     return (
       <main className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(to bottom, #0a0a0f, #0f0a1a)" }}>
-        <div className="text-white text-xl animate-pulse">Карж байна...</div>
+        <div className="text-white text-xl animate-pulse">Ачааллаж байна...</div>
       </main>
     )
   }

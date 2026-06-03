@@ -46,7 +46,7 @@ export default function MyMoviesPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-20 text-gray-500">Карж байна...</div>
+          <div className="text-center py-20 text-gray-500">Ачааллаж байна...</div>
         ) : movies.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-5xl mb-4">🎬</div>

@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Hard fallback: if supabase never resolves the initial session
     // (iOS Safari has been seen to hang here), don't block the UI on
-    // "Карж байна..." forever. After 3s, give up and proceed as
+    // "Ачааллаж байна..." forever. After 3s, give up and proceed as
     // signed-out; a later auth-state event can still update state.
     const fallback = setTimeout(() => {
       if (mounted && !settled) {

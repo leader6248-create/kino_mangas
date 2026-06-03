@@ -117,8 +117,14 @@ function QpayModal({ movie, userId, accessToken, onClose, onSuccess }) {
 
   useEffect(() => {
     if (!invoice?.invoice_id) return
-    appendDebug("auto-poll started")
+    appendDebug("auto-poll started (2s)")
+    // Single-flight guard: skip a tick if the previous /check is still
+    // in flight, so a slow QPay response can't queue up parallel calls
+    // when the interval is short.
+    let inFlight = false
     const timer = setInterval(async () => {
+      if (inFlight) return
+      inFlight = true
       try {
         const res = await fetch(`/api/qpay/check?invoice_id=${invoice.invoice_id}`)
         const data = await res.json()
@@ -132,8 +138,10 @@ function QpayModal({ movie, userId, accessToken, onClose, onSuccess }) {
         console.error("Auto-check error:", err)
         appendDebug(`auto ERR ${err?.message}`)
         setError(err?.message || "Худалдан авалтыг баталгаажуулахад алдаа гарлаа")
+      } finally {
+        inFlight = false
       }
-    }, 5000)
+    }, 2000)
     return () => clearInterval(timer)
   }, [invoice, finalize, appendDebug])
 
@@ -311,7 +319,7 @@ export default function MoviePage({ params }) {
 
   if (loading || authLoading) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <div className="text-white text-xl animate-pulse">Карж байна...</div>
+      <div className="text-white text-xl animate-pulse">Ачааллаж байна...</div>
     </div>
   )
 

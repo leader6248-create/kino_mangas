@@ -50,7 +50,7 @@ export default function WatchPage({ params }) {
 
   if (loading || authLoading) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="text-white text-xl animate-pulse">Карж байна...</div>
+      <div className="text-white text-xl animate-pulse">Ачааллаж байна...</div>
     </div>
   )
 
